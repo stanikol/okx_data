@@ -19,13 +19,6 @@ object Candle {
 
   private val psqlDateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm:ss")
 
-//  given putLocalDateTime: Put[LocalDateTime] =
-//    Put[Timestamp].tcontramap{(ldt: LocalDateTime) =>
-//      val dt = ldt.format(psqlDateTimeFormatter)
-//      println(s"dt=$dt")
-//      Timestamp.valueOf(dt)
-//    }
-
   given putLocalDateTime: Put[LocalDateTime] =
     Put[Timestamp].tcontramap{(ldt: LocalDateTime) =>
       Timestamp.valueOf(ldt)
