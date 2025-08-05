@@ -33,14 +33,12 @@ object Main
     val end = LocalDateTime.now(ZoneId.of("UTC")).minusDays(1)
     val start = end.minusHours(1)
     assert(start < end)
-    val after = Some(end)
-    val before = Some(start)
-    resources.use { case (httpClient, tx) =>
+    resources.use { (httpClient, tx) =>
       for {
         _ <- sql"drop table if exists delme".update.run.transact(tx)
         candles: List[Candle] <- getCandles(httpClient, GET_HISTORY_CANDLES)(
-          after,
-          before,
+          start.some,
+          end.some,
           Tickers.BTC -> Tickers.USDT,
           `1m`,
           limit = 100

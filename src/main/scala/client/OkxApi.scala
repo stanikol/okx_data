@@ -8,24 +8,16 @@ import io.circe.generic.auto.*
 import org.http4s.*
 import org.http4s.circe.CirceEntityDecoder.*
 import org.http4s.client.Client
-import org.http4s.client.middleware.FollowRedirect
-import org.http4s.implicits.{path, uri}
-import org.http4s.netty.client.NettyClientBuilder
+import org.http4s.implicits.uri
 import utils.DateTimeUtils.encodeDateTime
 
 import java.time.LocalDateTime
-import scala.concurrent.duration.*
 
 trait OkxApi {
 
   protected val GET_HISTORY_CANDLES: Uri = uri"https://okx.com/api/v5/market/history-index-candles"
   protected val GET_CANDLES: Uri = uri"https://okx.com/api/v5/market/index-candles"
 
-  def httpClient: Resource[IO, Client[IO]] =
-    NettyClientBuilder[IO]
-      .withIdleTimeout(10.seconds)
-      .resource
-      .map(FollowRedirect(5))
 
   def getHistoryCandles(client: Client[IO])(
       ts: LocalDateTime,
@@ -34,9 +26,14 @@ trait OkxApi {
       limit: Int = 1000
   ): IO[List[Candle]] = ???
 
+  /**
+   *
+   * @param after - END of period
+   * @param before - START of period
+   */
   def getCandles(client: Client[IO], uriApi: Uri)(
-    after: Option[LocalDateTime],
     before: Option[LocalDateTime],
+    after: Option[LocalDateTime],
     pair: Pair | String,
     candleSize: CandleSize | String,
     limit: Int = 1000
