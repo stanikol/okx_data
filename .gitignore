@@ -1,0 +1,10 @@
+/.bloop/
+/.bsp/
+/.idea/
+/.metals/
+/.vscode/
+/target/
+target/
+/src/main/scala/tests/
+/project/.bloop/
+/project/target/
