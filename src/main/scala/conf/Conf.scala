@@ -10,8 +10,8 @@ case class DbConf(
     host: String,
     port: Int
 )
-case class OkxData(db: DbConf)
-case class ApplicationConf(okx_data: OkxData)
+
+case class ApplicationConf(db: DbConf)
 object ApplicationConf {
   def apply(): Either[circe.Error, ApplicationConf] =
     parser.decode[ApplicationConf]()

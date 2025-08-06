@@ -6,6 +6,8 @@ import java.sql.Timestamp
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+type CandleType = (Tickers, CandleSize)
+
 case class Candle(
     ts: LocalDateTime,
     o: BigDecimal,
