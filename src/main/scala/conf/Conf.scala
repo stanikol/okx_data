@@ -2,13 +2,13 @@ package conf
 
 import io.circe
 import io.circe.config.parser
-import io.circe.generic.auto.*
+import io.circe.generic.auto._
 case class DbConf(
-    user: String,
-    dbname: String,
-    pswd: String,
-    host: String,
-    port: Int
+  user: String,
+  dbname: String,
+  pswd: String,
+  host: String,
+  port: Int
 )
 
 case class ApplicationConf(db: DbConf)

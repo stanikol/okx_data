@@ -1,63 +1,40 @@
 package example
 
-import candles.CandleSize.*
-import candles.Tickers
-import cats.*
-import cats.effect.*
-import cats.implicits.*
-import client.OkxApiCandle
-import conf.ApplicationConf
-import db.{CandleTable, DoobieTransactor}
-import doobie.*
-import doobie.implicits.*
+import candles._
+import cats._
+import cats.effect._
+import db.DoobieTransactor
+import doobie._
+import man.CandleService
 import org.http4s.client.Client
+import org.http4s.client.middleware.FollowRedirect
+import org.http4s.netty.client.NettyClientBuilder
 
-import java.time.{LocalDateTime, ZoneId}
-import scala.math.Ordered.orderingToOrdered
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.util.TimeZone
+import scala.concurrent.duration._
 
 object Main
     extends IOApp.Simple
-    with CandleTable
-    with DoobieTransactor
-    with OkxApiCandle {
+    with CandleService
+    with DoobieTransactor:
 
   private val resources: Resource[IO, (Client[IO], Transactor[IO])] = for {
-    applicationConf: ApplicationConf <- Resource.liftK(
-      IO.fromEither(conf.ApplicationConf.apply())
-    )
-    httpClient <- httpClient
-    tx <- transactor(applicationConf.db)
+    httpClient: Client[IO] <- NettyClientBuilder[IO]
+      .withIdleTimeout(10.seconds)
+      .resource
+      .map(FollowRedirect(5))
+    tx: Transactor[IO] <- transactor
   } yield httpClient -> tx
 
   def run: IO[Unit] = {
-    val end = LocalDateTime.now(ZoneId.of("UTC"))
-    val start = end.minusHours(15)
-    assert(start < end)
-    resources.use { (httpClient, tx) =>
-      for {
-        _ <- IO.println(s"start=$start end=$end")
-        _ <- sql"drop table if exists delme".update.run.transact(tx)
-        candles <- getCandleStream(httpClient, GET_HISTORY_CANDLES)(
-          start,
-          end,
-          Tickers.BTC -> Tickers.USDT,
-          `1m`
-        ).evalTap(c =>
-          IO.println(s"Step ${c.map(_.ts).min} ${c.map(_.ts).max} ${c.length}")
-        ).take(10)
-          .compile
-          .toList
-        c = candles.flatten
-        _ <- IO.println(
-          s"Final ${c.map(_.ts).min} ${c.map(_.ts).max} ${c.length}"
-        )
-        _ <- IO.println(s"")
-//        _ <- IO.println(candles.head, candles.last, candles.length)
-//        _ <- (createCandleTable("delme") >> insertCandles("delme", candles)).transact(tx)
-//        _ <- IO.println(":)")
-//        candles2 <- selectCandles("delme").transact(tx)
-//        _ <- IO.println(candles2.head, candles2.last, candles2.length)
-      } yield ()
-    }
+    val startTime: LocalDateTime = LocalDateTime.parse("2021-01-01T00:00")
+    val endTime = LocalDateTime.parse("2022-01-10T07:00")
+    val candleType: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1m`)
+    IO(TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of("UTC")))) >>
+      resources.use { (httpClient, tx) =>
+        update(candleType, httpClient, tx)
+      }
   }
-}
+end Main

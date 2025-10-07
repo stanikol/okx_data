@@ -1,9 +1,12 @@
 insert into table_name
-values (?, ?, ?, ?, ?, ?)
+values (?, ?, ?, ?, ?, ?, ?, ?, ?)
 on conflict (ts) do update set
-        o = EXCLUDED.o,
-        h = EXCLUDED.h,
-        l = EXCLUDED.l,
-        c = EXCLUDED.c,
-        s = EXCLUDED.s
-    where table_name.s = '0' and EXCLUDED.s='1';
+        open        = EXCLUDED.open,
+        high        = EXCLUDED.high,
+        low         = EXCLUDED.low,
+        close       = EXCLUDED.close,
+        volume      = EXCLUDED.volume,
+        volCcy      = EXCLUDED.volCcy,
+        volCcyQuote = EXCLUDED.volCcyQuote,
+        confirm     = EXCLUDED.confirm
+    where table_name.confirm = '0' and EXCLUDED.confirm = '1';

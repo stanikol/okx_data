@@ -1,40 +1,37 @@
 package db
 
-import cats.effect.{IO, Resource}
+import cats.effect.IO
+import cats.effect.kernel.Resource
+import conf.ApplicationConf
 import conf.DbConf
-import doobie.*
+import doobie._
 import doobie.util.log.LogEvent
-import org.http4s.client.Client
-import org.http4s.client.middleware.FollowRedirect
-import org.http4s.netty.client.NettyClientBuilder
-
-import scala.concurrent.duration.*
-
+import io.circe.config.parser
+import io.circe.generic.auto._
 trait DoobieTransactor {
 
-  def httpClient: Resource[IO, Client[IO]] =
-    NettyClientBuilder[IO]
-      .withIdleTimeout(10.seconds)
-      .resource
-      .map(FollowRedirect(5))
+  val transactor: Resource[IO, Transactor[IO]] = for {
+    applicationConf <- Resource.liftK.apply(parser.decodeF[IO, ApplicationConf]())
+    r <- Resource.make(acquire(applicationConf.db))(_ => IO.unit)
+  } yield r
 
-  private val printSqlLogHandler: LogHandler[IO] = new LogHandler[IO] {
-    def run(logEvent: LogEvent): IO[Unit] = IO.println(
-      "SQL: " + logEvent.sql + "\n\tsql_params: " + logEvent.params.allParams.mkString
-    )
-  }
-
-  private def acquire(c: DbConf): IO[Transactor[IO]] = IO {
-    import c.*
+  private def acquire(db: DbConf) = IO(
     Transactor.fromDriverManager[IO](
       driver = "org.postgresql.Driver",
-      url = s"jdbc:postgresql://$host:$port/$dbname",
-      user = user,
-      password = pswd,
-      logHandler = None // Some(printSqlLogHandler)
+      url = s"jdbc:postgresql://${db.host}:${db.port}/${db.dbname}", // Connect URL
+      user = db.user,
+      password = db.pswd,
+      logHandler = None
+      // Some(LogHandler.jdkLogHandler)
+      // Some(printSqlLogHandler)
     )
-  }
+  )
 
-  def transactor(c: DbConf): Resource[IO, Transactor[IO]] =
-    Resource.make(acquire(c)) { _ => IO.pure(()) }
+  private val printSqlLogHandler: LogHandler[IO] = new LogHandler[IO] {
+    def run(logEvent: LogEvent): IO[Unit] =
+      IO {
+        // println(s"SQL QUERY: " + logEvent.sql + "\nSQL PARAMS: " + logEvent.params.allParams)
+        println(s"SQL QUERY: " + logEvent.sql + "\nSQL PARAMS COUNT: " + logEvent.params.allParams.length)
+      }
+  }
 }
