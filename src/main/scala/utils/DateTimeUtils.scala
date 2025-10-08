@@ -1,5 +1,7 @@
 package utils
-import java.time.{Instant, LocalDateTime, ZoneId}
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 import scala.util.Try
 
 object DateTimeUtils {

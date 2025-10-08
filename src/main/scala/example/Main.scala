@@ -10,7 +10,6 @@ import org.http4s.client.Client
 import org.http4s.client.middleware.FollowRedirect
 import org.http4s.netty.client.NettyClientBuilder
 
-import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.TimeZone
 import scala.concurrent.duration._
@@ -29,12 +28,13 @@ object Main
   } yield httpClient -> tx
 
   def run: IO[Unit] = {
-    val startTime: LocalDateTime = LocalDateTime.parse("2021-01-01T00:00")
-    val endTime = LocalDateTime.parse("2022-01-10T07:00")
+    // val startTime: LocalDateTime = LocalDateTime.parse("2021-01-01T00:00")
+    // val endTime = LocalDateTime.parse("2022-01-10T07:00")
     val candleType: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1m`)
+    val candleType2: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1H`)
     IO(TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of("UTC")))) >>
       resources.use { (httpClient, tx) =>
-        update(candleType, httpClient, tx)
+        update(candleType, httpClient, tx) >> update(candleType2, httpClient, tx)
       }
   }
 end Main

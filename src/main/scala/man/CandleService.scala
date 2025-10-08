@@ -11,20 +11,29 @@ import org.http4s.client.Client
 
 import java.time.LocalDateTime
 import scala.math.Ordered.orderingToOrdered
+import db.CandleTableStatus
+import scala.util.Try
 
 trait CandleService extends OkxApiCandle with CandleTable:
 
   def update(candleType: CandleType, httpClient: Client[IO], tx: Transactor[IO]): IO[Unit] = for {
-    status <- getCandleTableStatus(candleType).transact(tx)
-    latest = status.filter(s => s.ts2.isEmpty && s.duration.isEmpty).headOption
-    _ <- IO.raiseWhen(latest.isEmpty)(new Exception("Invalid data from getCandleTableStatus!"))
-    _ <- downladAndSave(latest.get.ts, LocalDateTime.now, candleType, httpClient, tx)
+    status: List[CandleTableStatus] <- getCandleTableStatus(candleType).transact(tx)
+    (latest, others) <- IO.fromTry(splitTableStatuses(status))
+    _ <- downladAndSave(latest.ts, LocalDateTime.now, candleType, httpClient, tx)
+    _ <- others.traverse_{(s: CandleTableStatus) => downladAndSave(s.ts, s.ts2.get, candleType, httpClient, tx)} 
     status <- getCandleTableStatus(candleType).transact(tx)
     errors = Eval.later(status.mkString(","))
     _ <- IO.raiseWhen(status.length != 1)(
       new Exception(s"Error updating candleType=${candleType} errors=${errors.value}!")
     )
   } yield ()
+
+  
+  def splitTableStatuses(l: List[CandleTableStatus]): Try[(CandleTableStatus, List[CandleTableStatus])] = Try {
+    val (other, latestGap) = l.span{ s => !(s.ts2.isEmpty && s.duration.isEmpty) }
+    assert(latestGap.length == 1)
+    latestGap.head -> other
+  }
 
   def downladAndSave(
     startTime: LocalDateTime,

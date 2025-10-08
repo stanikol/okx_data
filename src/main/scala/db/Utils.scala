@@ -1,5 +1,6 @@
 package db
 import doobie.util.Get
+
 import scala.concurrent.duration.Duration
 import scala.util.matching.Regex
 
