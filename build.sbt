@@ -53,3 +53,11 @@ libraryDependencies += "io.circe" %% "circe-config" % "0.10.2"
 
 libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.19"
 libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.19" % "test"
+
+ThisBuild / assemblyMergeStrategy := {
+  case "application.conf"                            => MergeStrategy.concat
+  case "unwanted.txt"                                => MergeStrategy.discard
+  case x => MergeStrategy.first
+    // val oldStrategy = (ThisBuild / assemblyMergeStrategy).value
+    // oldStrategy(x)
+}
