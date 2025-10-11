@@ -47,8 +47,7 @@ trait CandleService extends OkxApiCandle with CandleTable:
       _ <- createCandleTable(candleType).transact(tx)
       candles <- getCandleStream(httpClient, GET_HISTORY_CANDLES)(startTime, endTime, candleType)
         .evalTap { (c: List[Candle]) =>
-          val m =
-            s"Downloaded bunch minTs=${c.map(_.ts).min} maxTs=${c.map(_.ts).max} length=${c.length} candleType=$candleType"
+          val m = s"Downloaded ${c.length} candles [${c.map(_.ts).min}, ${c.map(_.ts).max}], candleType=$candleType."
           IO.println(m)
         }
         .evalMap { (cs: List[Candle]) => upsertCandle(candleType, cs).transact(tx) }

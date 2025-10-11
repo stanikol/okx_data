@@ -82,8 +82,7 @@ trait OkxApiCandle {
             val (newstartTime, newendTime) = startTime -> List(minTs, endTime).min
             Option.when(newstartTime <= newendTime)(candles, newstartTime -> newendTime).pure[IO]
           } else {
-            val m =
-              s"Warning: Empty response from endTimepoint in getCandleStream(startTime=$startTime, endTime=$endTime,  candleType=$candleType, apiUri=$apiUri)!"
+            val m = s"Empty response in getCandleStream([$startTime, $endTime], candleType=$candleType, apiUri=$apiUri)!"
             IO.println(m) >> Option.empty.pure[IO]
           }
         } yield next
@@ -98,7 +97,7 @@ trait OkxApiCandle {
         )
           .filter(_._1).map(_._2).mkString("\n")
       val msg = if (errorMsg.isEmpty())
-        s"Ok: Recieved Candles: candleType=$candleType,  time=[$startts, $endts], count=${tss.length}."
+        s"Recieved Candles: time=[$startts, $endts], count=${tss.length}, candleType=$candleType."
       else errorMsg
       IO.println(msg)
     }

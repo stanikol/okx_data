@@ -1,4 +1,4 @@
-package example
+package okxdata
 
 import candles._
 import cats._
@@ -13,8 +13,9 @@ import org.http4s.netty.client.NettyClientBuilder
 import java.time.ZoneId
 import java.util.TimeZone
 import scala.concurrent.duration._
+import java.time.LocalDateTime
 
-object Main
+object Add
     extends IOApp.Simple
     with CandleService
     with DoobieTransactor:
@@ -28,13 +29,13 @@ object Main
   } yield httpClient -> tx
 
   def run: IO[Unit] = {
-    // val startTime: LocalDateTime = LocalDateTime.parse("2021-01-01T00:00")
-    // val endTime = LocalDateTime.parse("2022-01-10T07:00")
-    val candleType: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1m`)
-    val candleType2: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1H`)
     IO(TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of("UTC")))) >>
       resources.use { (httpClient, tx) =>
-        update(candleType, httpClient, tx) >> update(candleType2, httpClient, tx)
+        val startTime: LocalDateTime = LocalDateTime.parse("2018-01-01T00:00")
+        val endTime: LocalDateTime = LocalDateTime.parse("2018-02-01T00:00")
+        // val endTime = LocalDateTime.now()
+        val candleType: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1Dutc`)
+        downladAndSave(startTime, endTime, candleType, httpClient, tx)
       }
   }
-end Main
+end Add
