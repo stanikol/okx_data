@@ -1,5 +1,7 @@
 package candles
 
+import utils.DateTimeUtils.decodeDateTime
+
 import java.time.LocalDateTime
 import java.time.{Duration => DurationJava}
 import scala.concurrent.duration._
@@ -56,3 +58,34 @@ case class Candle(
   volCcyQuote: BigDecimal,
   confirm: String
 )
+
+object Candle:
+  def fromStrings(xs: Seq[String]): Try[Candle] = {
+    for {
+      _ <- Try(assert(xs.length == 8, "Invalid candle data!"))
+      ts <- decodeDateTime(xs.head)
+      o <- parseBigDecimal(xs(1))
+      h <- parseBigDecimal(xs(2))
+      l <- parseBigDecimal(xs(3))
+      c <- parseBigDecimal(xs(4))
+      volume <- parseBigDecimal(xs(5))
+      volCcy <- parseBigDecimal(xs(6))
+      volCcyQuote <- parseBigDecimal(xs(7))
+    } yield Candle(ts, o, h, l, c, volume, volCcy, volCcyQuote, xs(8))
+  }
+  
+  def fromStringsBrief(xs: Seq[String]): Try[Candle] = {
+    for {
+      _ <- Try(assert(xs.length == 6, s"Invalid candle data: xs.length=${xs.length} != 6 !"))
+      ts <- decodeDateTime(xs.head)
+      o <- parseBigDecimal(xs(1))
+      h <- parseBigDecimal(xs(2))
+      l <- parseBigDecimal(xs(3))
+      c <- parseBigDecimal(xs(4))
+    } yield Candle(ts, o, h, l, c, 0, 0, 0, xs(5))
+  }
+//    .recoverWith { case e => println(s"Error in Candle.fromStrings($xs): ${e.getMessage} !"); Failure(e) }
+
+  private def parseBigDecimal(s: String): Try[BigDecimal] = Try(BigDecimal(s))
+
+end Candle

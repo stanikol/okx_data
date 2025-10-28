@@ -1,9 +1,8 @@
 package db
 import doobie.util.Get
 
-import scala.concurrent.duration.Duration
-// import scala.util.matching.Regex
 import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.Duration
 
 object Utils {
   given convertDateTimeFromLong: Get[Duration] = Get[Long].tmap(l => Duration(l, TimeUnit.MILLISECONDS))

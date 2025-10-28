@@ -10,10 +10,10 @@ import org.http4s.client.Client
 import org.http4s.client.middleware.FollowRedirect
 import org.http4s.netty.client.NettyClientBuilder
 
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.TimeZone
 import scala.concurrent.duration._
-import java.time.LocalDateTime
 
 object Add
     extends IOApp.Simple
@@ -35,7 +35,7 @@ object Add
         val endTime: LocalDateTime = LocalDateTime.parse("2018-02-01T00:00")
         // val endTime = LocalDateTime.now()
         val candleType: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1Dutc`)
-        downladAndSave(startTime, endTime, candleType, httpClient, tx)
+        downloadAndSave(startTime, endTime, candleType, httpClient, tx)
       }
   }
 end Add
