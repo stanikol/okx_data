@@ -81,6 +81,7 @@ trait CandleService extends OkxApiCandle with CandleTable:
             >> wsConnection.receive.map("First frame: "+_.toString).map(IO.println)
             >> wsConnection.receiveStream.evalMap(upsertFrame).evalMap(_ => killSwitch.get).takeWhile(_==false).compile.drain
             >> wsConnection.send(unsubscribe.asFrame)
+            >> IO.sleep(3.seconds)
             >> IO.println("End wsConnection")
       } >> IO.println("WSClient close")
     }
