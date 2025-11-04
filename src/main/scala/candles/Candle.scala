@@ -31,21 +31,24 @@ object CandleSize:
     CandleSize.valueOf(s)
   }
 
-  def countTicks(startTime: LocalDateTime, endTime: LocalDateTime, candelSize: CandleSize): Long =
+  def countTicks(startTime: LocalDateTime, endTime: LocalDateTime, candleSize: CandleSize): Long =
     val timeSpan: FiniteDuration = DurationJava.between(startTime, endTime).toScala
-    val count: Long = timeSpan.toNanos / candelSize.duration.toNanos
+    val count: Long = timeSpan.toNanos / candleSize.duration.toNanos
     count
   end countTicks
 
 end CandleSize
 
 enum Currency:
-  case USDT, BTC
+  case USDT, BTC, XRP
 end Currency
 
 type Pair = (Currency, Currency)
 
-type CandleType = (pair: Pair, candleSize: CandleSize)
+case class CandleType(pair: Pair, candleSize: CandleSize) {
+  val candleTableName: String = s"spot_candle_${pair._1}_${pair._2}_${candleSize}"
+
+}
 
 case class Candle(
   ts: LocalDateTime,
@@ -60,9 +63,10 @@ case class Candle(
 )
 
 object Candle:
+  // https://my.okx.com/docs-v5/en/#order-book-trading-market-data-get-candlesticks-history
   def fromStrings(xs: Seq[String]): Try[Candle] = {
     for {
-      _ <- Try(assert(xs.length == 8, "Invalid candle data!"))
+      _ <- Try(assert(xs.length == 9, s"Invalid candle data! Can not parse candle from this seq: ${xs.mkString("[",", ","]")}, len=${xs.length}"))
       ts <- decodeDateTime(xs.head)
       o <- parseBigDecimal(xs(1))
       h <- parseBigDecimal(xs(2))
@@ -73,7 +77,7 @@ object Candle:
       volCcyQuote <- parseBigDecimal(xs(7))
     } yield Candle(ts, o, h, l, c, volume, volCcy, volCcyQuote, xs(8))
   }
-  
+
   def fromStringsBrief(xs: Seq[String]): Try[Candle] = {
     for {
       _ <- Try(assert(xs.length == 6, s"Invalid candle data: xs.length=${xs.length} != 6 !"))

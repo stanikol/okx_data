@@ -31,7 +31,7 @@ trait DoobieTransactor {
     def run(logEvent: LogEvent): IO[Unit] =
       IO {
         // println(s"SQL QUERY: " + logEvent.sql + "\nSQL PARAMS: " + logEvent.params.allParams)
-        println(s"SQL QUERY: " + logEvent.sql + "\nSQL PARAMS COUNT: " + logEvent.params.allParams.length)
+        println("SQL QUERY: " + logEvent.sql + "\nSQL PARAMS COUNT: " + logEvent.params.allParams.length)
       }
   }
 }

@@ -34,7 +34,7 @@ object Add
         val startTime: LocalDateTime = LocalDateTime.parse("2018-01-01T00:00")
         val endTime: LocalDateTime = LocalDateTime.parse("2018-02-01T00:00")
         // val endTime = LocalDateTime.now()
-        val candleType: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1Dutc`)
+        val candleType = CandleType((Currency.BTC, Currency.USDT), CandleSize.`1Dutc`)
         downloadAndSave(startTime, endTime, candleType, httpClient, tx)
       }
   }

@@ -1,4 +1,6 @@
+package okxdata
 import candles.CandleSize
+import candles.CandleType
 import candles.Currency
 import cats._
 import cats.effect._
@@ -10,12 +12,9 @@ import org.http4s.netty.client._
 
 import scala.concurrent.duration._
 
-object TestIt extends IOApp.Simple with CandleService with DoobieTransactor:
-////  val wsUri = uri"wss://wspap.okx.com:8443/ws/v5/business"
-//  val wsUri: Uri = uri"wss://ws.okx.com:8443/ws/v5/business"
-  import candles.CandleType
+object TestWebsocketUpdate extends IOApp.Simple with CandleService with DoobieTransactor:
 
-  val wsClient: Resource[IO, WSClient[IO]] = NettyWSClientBuilder[IO].withIdleTimeout(5.seconds).resource
+  def wsClient: Resource[IO, WSClient[IO]] = NettyWSClientBuilder[IO].withIdleTimeout(5.seconds).resource
 
   def stop(ref: Ref[IO, Boolean]): IO[Unit] = {
     IO.readLine
@@ -24,20 +23,21 @@ object TestIt extends IOApp.Simple with CandleService with DoobieTransactor:
   }
 
   override def run: IO[Unit] =
-    val candleType: CandleType = (pair = (Currency.BTC, Currency.USDT), candleSize = CandleSize.`1m`)
+    val candleTypes: List[CandleType] = List(
+      CandleType((Currency.BTC, Currency.USDT), CandleSize.`1m`),
+      CandleType((Currency.XRP, Currency.USDT), CandleSize.`1m`)
+    )
 
-    val resource: Resource[IO, (WSClient[IO], Transactor[IO])] =
-      for (w <- wsClient; t <- transactor) yield w -> t
+    val resource = for (w <- wsClient; t <- transactor) yield (w, t)
 
     resource.use { (wsClient, tx: Transactor[IO]) =>
       for {
         killSwitch <- Ref.of[IO, Boolean](false)
         killProc <- stop(killSwitch).start
-        _ <- websocketUpdate(candleType, wsClient, killSwitch, tx)
+        _ <- websocketUpdate(candleTypes, killSwitch, tx).start
         _ <- killProc.join
       } yield ExitCode.Success
     }
-
   end run
 
-end TestIt
+end TestWebsocketUpdate
