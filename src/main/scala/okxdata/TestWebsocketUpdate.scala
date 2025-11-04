@@ -30,12 +30,17 @@ object TestWebsocketUpdate extends IOApp.Simple with CandleService with DoobieTr
 
     val resource = for (w <- wsClient; t <- transactor) yield (w, t)
 
-    resource.use { (wsClient, tx: Transactor[IO]) =>
+    // resource.use { (wsClient, tx: Transactor[IO]) =>
+    transactor.use { ( tx: Transactor[IO]) =>
       for {
         killSwitch <- Ref.of[IO, Boolean](false)
         killProc <- stop(killSwitch).start
-        _ <- websocketUpdate(candleTypes, killSwitch, tx).start
+        update <- websocketUpdate(candleTypes, killSwitch, tx).start
+        _ <-IO.println(11)
         _ <- killProc.join
+        _ <- IO.println(22)
+        _ <- update.join
+        _ <- IO.println(33)
       } yield ExitCode.Success
     }
   end run

@@ -8,3 +8,6 @@ target/
 /src/main/scala/tests/
 /project/.bloop/
 /project/target/
+.bloop/
+/project/project/.bloop/
+trades.tsvproject/

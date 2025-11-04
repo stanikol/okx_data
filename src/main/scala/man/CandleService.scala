@@ -9,6 +9,7 @@ import db.CandleTableStatus
 import doobie._
 import doobie.implicits._
 import io.circe._
+import io.circe.generic.auto._
 import io.circe.parser.{parse => parseJson}
 import org.http4s.Uri
 import org.http4s.client.Client
@@ -46,46 +47,44 @@ trait CandleService extends OkxApiCandle with CandleTable:
     //  val wsUri = uri"wss://wspap.okx.com:8443/ws/v5/business"
     // val wsUri: Uri = uri"wss://ws.okx.com:8443/ws/v5/business" //nb!!!
 
-    def upsertFrame(f: WSFrame): IO[Unit] =
-      println(s"upsertFrame: Got WSFRAME= $f")
+    def upsertFrame(wsFrame: WSFrame): IO[Unit] =
+      println(s"upsertFrame($wsFrame) ...")
       def upsert(c: Candle): IO[Unit] =
         // IO.whenA(c.confirm == "1")(upsertCandle(candleType, List(c)).transact(tx).as(()))
         IO.unit
 
       val candles: Either[Throwable, List[Candle]] = {
         Either.cond[Throwable, String](
-          f.isInstanceOf[Text],
-          f.asInstanceOf[Text].data,
-          new Exception(s"Error in websocketUpdate(candleType): got unexpected WSFrame $f !") // todo candleType
+          wsFrame.isInstanceOf[Text],
+          wsFrame.asInstanceOf[Text].data,
+          new Exception(s"Error in upsertFrame($wsFrame): Text frame expected !") // todo candleType
         )
           .flatMap(parseJson)
-          .flatMap((_: Json).hcursor.downField("data").as[List[List[String]]])
-          .flatMap(_.traverse(Candle.fromStringsBrief).toEither)
+          .flatMap(_.as[WSCandleFrame])
+          .flatMap(_.data.traverse(Candle.fromStringsBrief).toEither)
           .handleErrorWith { e =>
             println(s"Error ${e.getMessage}"); Left(e)
           }
       }
       IO.whenA(candles.isRight)(candles.toOption.get.traverse(upsert).as(()))
-        >> IO.println(s"upsertFrame($f): Finished")
+        >> IO.println(s"OK: upsertFrame($wsFrame): Finished")
     end upsertFrame
 
-    def checkKillSwitch(killSwitch: Ref[IO, Boolean])(ins: fs2.Stream[IO, WSFrame]): fs2.Stream[IO, WSFrame] =
-      ins.evalMap(f => killSwitch.get.map(f -> _)).takeWhile(_._2 == false).map(_._1)
-
-    val subscriptions: List[WSSubscription] = candleTypes.map(WSSubscription.apply)
+    val subscribe: WSSubscribe = WSSubscribe(candleTypes)
+    val unsubscribe: WSUnsubscribe = WSUnsubscribe(subscribe)
     NettyWSClientBuilder[IO].withIdleTimeout(5.seconds).resource.use {
       _.connect(WSRequest(wsUri)).use {
         (wsConnection: WSConnection[IO]) =>
           IO.println("Using wsConnection ...")
-            >> subscriptions.map(_.subscribe).traverse(wsConnection.send)
-            // >> wsConnection.receive.map("First frame: "+_.toString).map(IO.println)
-            >> wsConnection.receiveStream.through(checkKillSwitch(killSwitch)).evalMap(upsertFrame).compile.drain
-            >> subscriptions.map(_.unsubscribe).traverse(wsConnection.send)
+            >> IO.println(s"Subscribing ${subscribe.asFrame.toString} ...")
+            >> wsConnection.send(subscribe.asFrame)
+            >> wsConnection.receive.map("First frame: "+_.toString).map(IO.println)
+            >> wsConnection.receiveStream.evalMap(upsertFrame).evalMap(_ => killSwitch.get).takeWhile(_==false).compile.drain
+            >> wsConnection.send(unsubscribe.asFrame)
             >> IO.println("End wsConnection")
-      }
+      } >> IO.println("WSClient close")
     }
   end websocketUpdate
-
 
   private def splitTableStatuses(l: List[CandleTableStatus]): Try[(CandleTableStatus, List[CandleTableStatus])] = Try {
     val (other, latestGap) = l.span { s => !(s.ts2.isEmpty && s.duration.isEmpty) }
