@@ -30,7 +30,8 @@ trait CandleService extends OkxApiCandle with CandleTable:
     status: List[CandleTableStatus] <- getCandleTableStatus(candleType).transact(tx)
     (latest, others) <- IO.fromTry(splitTableStatuses(status))
     _ <- downloadAndSave(latest.ts, LocalDateTime.now, candleType, httpClient, tx)
-    _ <- others.traverse_ { (s: CandleTableStatus) => downloadAndSave(s.ts, s.ts2.get, candleType, httpClient, tx) }
+    _ <- others.traverse_ { (s: CandleTableStatus) => //noinspection IllegalOptionGet
+      downloadAndSave(s.ts, s.ts2.get, candleType, httpClient, tx) }
     status <- getCandleTableStatus(candleType).transact(tx)
     errors = Eval.later(status.mkString(","))
     _ <- IO.raiseWhen(status.length != 1)(
@@ -38,6 +39,7 @@ trait CandleService extends OkxApiCandle with CandleTable:
     )
   } yield ()
 
+  //noinspection SpellCheckingInspection
   def websocketUpdate(
     candleTypes: List[CandleType],
     killSwitch: Ref[IO, Boolean],
@@ -51,7 +53,7 @@ trait CandleService extends OkxApiCandle with CandleTable:
       println(s"upsertFrame($wsFrame) ...")
       def upsert(c: Candle): IO[Unit] =
         // IO.whenA(c.confirm == "1")(upsertCandle(candleType, List(c)).transact(tx).as(()))
-        IO.unit
+        IO.println(s"upsertFrame($c): OK")
 
       val candles: Either[Throwable, List[Candle]] = {
         Either.cond[Throwable, String](
@@ -63,25 +65,33 @@ trait CandleService extends OkxApiCandle with CandleTable:
           .flatMap(_.as[WSCandleFrame])
           .flatMap(_.data.traverse(Candle.fromStringsBrief).toEither)
           .handleErrorWith { e =>
-            println(s"Error ${e.getMessage}"); Left(e)
+            println(s"Error  in upsertFrame($wsFrame): ${e.getMessage} !"); Left(e)
           }
       }
+      //noinspection IllegalOptionGet
       IO.whenA(candles.isRight)(candles.toOption.get.traverse(upsert).as(()))
-        >> IO.println(s"OK: upsertFrame($wsFrame): Finished")
     end upsertFrame
 
     val subscribe: WSSubscribe = WSSubscribe(candleTypes)
     val unsubscribe: WSUnsubscribe = WSUnsubscribe(subscribe)
-    NettyWSClientBuilder[IO].withIdleTimeout(5.seconds).resource.use {
-      _.connect(WSRequest(wsUri)).use {
-        (wsConnection: WSConnection[IO]) =>
+    NettyWSClientBuilder[IO].withIdleTimeout(5.seconds).resource.use { (c: WSClient[IO]) =>
+      c.connectHighLevel(WSRequest(wsUri)).use { (wsConnection: WSConnectionHighLevel[IO]) =>
+          def unsubscribeCheck: IO[Boolean] = for {
+            stop <- killSwitch.get
+            _ <- IO.whenA(stop){
+                wsConnection.send(unsubscribe.asFrame)
+                  >> IO.println(s"KillSwitch is ON! unsubscribe=${unsubscribe.asFrame.toString}")
+            }
+          } yield stop
+
           IO.println("Using wsConnection ...")
             >> IO.println(s"Subscribing ${subscribe.asFrame.toString} ...")
             >> wsConnection.send(subscribe.asFrame)
             >> wsConnection.receive.map("First frame: "+_.toString).map(IO.println)
-            >> wsConnection.receiveStream.evalMap(upsertFrame).evalMap(_ => killSwitch.get).takeWhile(_==false).compile.drain
-            >> wsConnection.send(unsubscribe.asFrame)
-            >> IO.sleep(3.seconds)
+            >> wsConnection.receiveStream
+                .evalMap(upsertFrame).evalMap(_ => unsubscribeCheck)
+                .takeWhile(_==false)
+                .compile.drain
             >> IO.println("End wsConnection")
       } >> IO.println("WSClient close")
     }
