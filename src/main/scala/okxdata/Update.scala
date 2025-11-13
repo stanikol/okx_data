@@ -20,6 +20,8 @@ object Update
     with CandleService
     with DoobieTransactor:
 
+  import CandleTypes.candleTypes
+
   private val resources: Resource[IO, (Client[IO], Transactor[IO])] = for {
     httpClient: Client[IO] <- NettyClientBuilder[IO]
       .withIdleTimeout(10.seconds)
@@ -29,12 +31,9 @@ object Update
   } yield httpClient -> tx
 
   def run: IO[Unit] = {
-    val candleType = CandleType((Currency.BTC, Currency.USDT), CandleSize.`1m`)
-    val candleType2= CandleType((Currency.BTC, Currency.USDT), CandleSize.`1H`)
-    val candleType3= CandleType((Currency.BTC, Currency.USDT), CandleSize.`1Dutc`)
     IO(TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of("UTC")))) >>
       resources.use { (httpClient, tx) =>
-        List(candleType, candleType2, candleType3).traverse_(ct=> update(ct, httpClient, tx))
+        candleTypes.traverse_((ct: CandleType) => update(ct, httpClient, tx))
       }
   }
 end Update

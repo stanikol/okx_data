@@ -99,7 +99,7 @@ trait CandleService extends OkxApiCandle with CandleTable:
 
   private def splitTableStatuses(l: List[CandleTableStatus]): Try[(CandleTableStatus, List[CandleTableStatus])] = Try {
     val (other, latestGap) = l.span { s => !(s.ts2.isEmpty && s.duration.isEmpty) }
-    assert(latestGap.length == 1)
+    assert(latestGap.length == 1, "Ivalid CandleTableStatus - found more then one empty gap!")
     latestGap.head -> other
   }
 
@@ -114,6 +114,7 @@ trait CandleService extends OkxApiCandle with CandleTable:
     for {
       _ <- IO.println(s"Starting downloadAndSave(start=$startTime, end=$endTime, candleType=$candleType)")
       _ <- createCandleTable(candleType).transact(tx)
+            .recoverWith{case e => IO.println(s"Error createCandleTable($candleType): ${e.getMessage} !") >> IO.raiseError(e)}
       candles <- getCandleStream(httpClient, GET_HISTORY_CANDLES)(startTime, endTime, candleType)
         // .evalTap { (c: List[Candle]) =>
         //   val m = s"Downloaded ${c.length} candles [${c.map(_.ts).min}, ${c.map(_.ts).max}], candleType=$candleType."

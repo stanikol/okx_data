@@ -2,6 +2,7 @@ package okxdata
 
 import candles._
 import cats._
+import cats.syntax.all.*
 import cats.effect._
 import db.DoobieTransactor
 import doobie._
@@ -28,14 +29,22 @@ object Add
     tx: Transactor[IO] <- transactor
   } yield httpClient -> tx
 
+  val candleTyeps =  List(CandleType((Currency.BTC, Currency.USDT), CandleSize.`1m`),
+                       CandleType((Currency.BTC, Currency.USDT), CandleSize.`1H`),
+                       CandleType((Currency.BTC, Currency.USDT), CandleSize.`1Dutc`),
+                       CandleType((Currency.XRP, Currency.USDT), CandleSize.`1m`),
+                       CandleType((Currency.XRP, Currency.USDT), CandleSize.`1H`),
+                       CandleType((Currency.XRP, Currency.USDT), CandleSize.`1Dutc`))
+
   def run: IO[Unit] = {
     IO(TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of("UTC")))) >>
       resources.use { (httpClient, tx) =>
         val startTime: LocalDateTime = LocalDateTime.parse("2018-01-01T00:00")
-        val endTime: LocalDateTime = LocalDateTime.parse("2018-02-01T00:00")
-        // val endTime = LocalDateTime.now()
-        val candleType = CandleType((Currency.BTC, Currency.USDT), CandleSize.`1Dutc`)
-        downloadAndSave(startTime, endTime, candleType, httpClient, tx)
+        // val endTime: LocalDateTime = LocalDateTime.parse("2018-02-01T00:00")
+        val endTime = LocalDateTime.now()
+        // val candleType = CandleType((Currency.XRP, Currency.USDT), CandleSize.`1m`)
+        // downloadAndSave(startTime, endTime, candleType, httpClient, tx)
+        candleTyeps.traverse_(ct=> downloadAndSave(startTime, endTime, ct, httpClient, tx))
       }
   }
 end Add
