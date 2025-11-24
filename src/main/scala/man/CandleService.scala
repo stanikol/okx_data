@@ -27,19 +27,21 @@ import concurrent.duration._
 trait CandleService extends OkxApiCandle with CandleTable:
 
   def update(candleType: CandleType, httpClient: Client[IO], tx: Transactor[IO]): IO[Unit] = for {
+    _ <- initTableIfNotExists(candleType, httpClient, tx)
     status: List[CandleTableStatus] <- getCandleTableStatus(candleType).transact(tx)
     (latest, others) <- IO.fromTry(splitTableStatuses(status))
     _ <- downloadAndSave(latest.ts, LocalDateTime.now, candleType, httpClient, tx)
-    _ <- others.traverse_ { (s: CandleTableStatus) => //noinspection IllegalOptionGet
-      downloadAndSave(s.ts, s.ts2.get, candleType, httpClient, tx) }
+    _ <- others.traverse_ { (s: CandleTableStatus) => // noinspection IllegalOptionGet
+      downloadAndSave(s.ts, s.ts2.get, candleType, httpClient, tx)
+    }
     status <- getCandleTableStatus(candleType).transact(tx)
     errors = Eval.later(status.mkString(","))
     _ <- IO.raiseWhen(status.length != 1)(
-      new Exception(s"Error updating candleType=$candleType errors=${errors.value}!")
+      new Exception(s"Error updating $candleType errors=${errors.value}!")
     )
   } yield ()
 
-  //noinspection SpellCheckingInspection
+  // noinspection SpellCheckingInspection
   def websocketUpdate(
     candleTypes: List[CandleType],
     killSwitch: Ref[IO, Boolean],
@@ -68,7 +70,7 @@ trait CandleService extends OkxApiCandle with CandleTable:
             println(s"Error  in upsertFrame($wsFrame): ${e.getMessage} !"); Left(e)
           }
       }
-      //noinspection IllegalOptionGet
+      // noinspection IllegalOptionGet
       IO.whenA(candles.isRight)(candles.toOption.get.traverse(upsert).as(()))
     end upsertFrame
 
@@ -76,30 +78,31 @@ trait CandleService extends OkxApiCandle with CandleTable:
     val unsubscribe: WSUnsubscribe = WSUnsubscribe(subscribe)
     NettyWSClientBuilder[IO].withIdleTimeout(5.seconds).resource.use { (c: WSClient[IO]) =>
       c.connectHighLevel(WSRequest(wsUri)).use { (wsConnection: WSConnectionHighLevel[IO]) =>
-          def unsubscribeCheck: IO[Boolean] = for {
-            stop <- killSwitch.get
-            _ <- IO.whenA(stop){
-                wsConnection.send(unsubscribe.asFrame)
-                  >> IO.println(s"KillSwitch is ON! unsubscribe=${unsubscribe.asFrame.toString}")
-            }
-          } yield stop
+        def unsubscribeCheck: IO[Boolean] = for {
+          stop <- killSwitch.get
+          _ <- IO.whenA(stop) {
+            wsConnection.send(unsubscribe.asFrame)
+              >> IO.println(s"KillSwitch is ON! unsubscribe=${unsubscribe.asFrame.toString}")
+          }
+        } yield stop
 
-          IO.println("Using wsConnection ...")
-            >> IO.println(s"Subscribing ${subscribe.asFrame.toString} ...")
-            >> wsConnection.send(subscribe.asFrame)
-            >> wsConnection.receive.map("First frame: "+_.toString).map(IO.println)
-            >> wsConnection.receiveStream
-                .evalMap(upsertFrame).evalMap(_ => unsubscribeCheck)
-                .takeWhile(_==false)
-                .compile.drain
-            >> IO.println("End wsConnection")
+        IO.println("Using wsConnection ...")
+          >> IO.println(s"Subscribing ${subscribe.asFrame.toString} ...")
+          >> wsConnection.send(subscribe.asFrame)
+          >> wsConnection.receive.map("First frame: " + _.toString).map(IO.println)
+          >> wsConnection.receiveStream
+            .evalMap(upsertFrame).evalMap(_ => unsubscribeCheck)
+            .takeWhile(_ == false)
+            .compile.drain
+          >> IO.println("End wsConnection")
       } >> IO.println("WSClient close")
     }
   end websocketUpdate
 
   private def splitTableStatuses(l: List[CandleTableStatus]): Try[(CandleTableStatus, List[CandleTableStatus])] = Try {
     val (other, latestGap) = l.span { s => !(s.ts2.isEmpty && s.duration.isEmpty) }
-    assert(latestGap.length == 1, "Ivalid CandleTableStatus - found more then one empty gap!")
+    lazy val errorMsg = s"Ivalid CandleTableStatus - found more then one empty gap! latestGap=$latestGap"
+    assert(latestGap.length <= 1, errorMsg)
     latestGap.head -> other
   }
 
@@ -112,12 +115,12 @@ trait CandleService extends OkxApiCandle with CandleTable:
   ): IO[Unit] =
     assert(startTime < endTime)
     for {
-      _ <- IO.println(s"Starting downloadAndSave(start=$startTime, end=$endTime, candleType=$candleType)")
+      _ <- IO.println(s"Starting downloadAndSave(start=$startTime, end=$endTime, $candleType)")
       _ <- createCandleTable(candleType).transact(tx)
-            .recoverWith{case e => IO.println(s"Error createCandleTable($candleType): ${e.getMessage} !") >> IO.raiseError(e)}
+        .recoverWith { case e => IO.println(s"Error createCandleTable($candleType): ${e.getMessage} !") >> IO.raiseError(e) }
       candles <- getCandleStream(httpClient, GET_HISTORY_CANDLES)(startTime, endTime, candleType)
         // .evalTap { (c: List[Candle]) =>
-        //   val m = s"Downloaded ${c.length} candles [${c.map(_.ts).min}, ${c.map(_.ts).max}], candleType=$candleType."
+        //   val m = s"Downloaded ${c.length} candles [${c.map(_.ts).min}, ${c.map(_.ts).max}], $candleType."
         //   IO.println(m)
         // }
         .evalMap { (cs: List[Candle]) => upsertCandle(candleType, cs).transact(tx) }
@@ -126,3 +129,23 @@ trait CandleService extends OkxApiCandle with CandleTable:
     } yield ()
 
   end downloadAndSave
+
+  def initTableIfNotExists(candleType: CandleType, httpClient: Client[IO], tx: Transactor[IO], numberOfPeriods: Int = 301): IO[Unit] =
+    val tableName = candleType.candleTableName
+    val queryTableExists: ConnectionIO[Option[Int]] =
+         sql""" SELECT 1 
+              |   FROM pg_tables 
+              |   WHERE schemaname = 'public' AND
+              |         tablename = $tableName;""".stripMargin.query[Int].option
+
+    for 
+      tableExists <- queryTableExists.transact(tx)
+      _ <- IO.whenA(tableExists.isEmpty) {
+              val startTime = LocalDateTime.now.minusSeconds((candleType.candleSize.duration * numberOfPeriods).toSeconds)
+              IO.println(s"Initilazing empty table for $candleType") >>
+                downloadAndSave(startTime, LocalDateTime.now, candleType, httpClient, tx)
+      }
+    yield ()
+  end initTableIfNotExists
+
+end CandleService

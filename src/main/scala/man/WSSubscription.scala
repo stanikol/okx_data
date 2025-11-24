@@ -1,8 +1,11 @@
 package man
 
 import candles.CandleType
+import io.circe._
+import io.circe.generic.auto._
+import io.circe.syntax._
 import org.http4s.client.websocket.WSFrame.Text
-import io.circe.*, io.circe.syntax.*, io.circe.generic.auto.*
+
 import java.util.UUID
 
 

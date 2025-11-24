@@ -2,8 +2,8 @@ package okxdata
 
 import candles._
 import cats._
-import cats.syntax.all.*
 import cats.effect._
+import cats.syntax.all._
 import db.DoobieTransactor
 import doobie._
 import man.CandleService

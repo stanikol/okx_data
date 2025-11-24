@@ -40,13 +40,13 @@ object CandleSize:
 end CandleSize
 
 enum Currency:
-  case USDT, BTC, XRP
+  case USDT, BTC, XRP, SOL
 end Currency
 
 type Pair = (Currency, Currency)
 
 case class CandleType(pair: Pair, candleSize: CandleSize) {
-  val candleTableName: String = s"spot_candle_${pair._1}_${pair._2}_${candleSize}"
+  val candleTableName: String = s"spot_candle_${pair._1}_${pair._2}_${candleSize}".toLowerCase()
 
 }
 

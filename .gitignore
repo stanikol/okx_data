@@ -1,0 +1,15 @@
+/.bloop/
+/.bsp/
+/.idea/
+/.metals/
+/.vscode/
+/target/
+target/
+/src/main/scala/tests/
+/project/project/*
+/project/target/
+.bloop/
+/project/project/.bloop/
+trades.tsvproject/
+project/project/.bloop/bloop.settings.json
+project/project/.bloop/okx_data-build-build.json

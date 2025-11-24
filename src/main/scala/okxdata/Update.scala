@@ -6,6 +6,7 @@ import cats.effect._
 import cats.syntax.all._
 import db.DoobieTransactor
 import doobie._
+import doobie.implicits.toConnectionIOOps
 import man.CandleService
 import org.http4s.client.Client
 import org.http4s.client.middleware.FollowRedirect
@@ -33,7 +34,7 @@ object Update
   def run: IO[Unit] = {
     IO(TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of("UTC")))) >>
       resources.use { (httpClient, tx) =>
-        candleTypes.traverse_((ct: CandleType) => update(ct, httpClient, tx))
+        candleTypes.traverse_((ct: CandleType) => createCandleTable(ct).transact(tx) >>  update(ct, httpClient, tx))
       }
   }
 end Update

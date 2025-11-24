@@ -22,8 +22,8 @@ trait DoobieTransactor {
       user = db.user,
       password = db.pswd,
       logHandler = None
-      // Some(LogHandler.jdkLogHandler)
-      // Some(printSqlLogHandler)
+      // logHandler = Some(LogHandler.jdkLogHandler)
+      // logHandler = Some(printSqlLogHandler)
     )
   )
 
